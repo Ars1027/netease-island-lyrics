@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: https://*.music.126.net https://music.163.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none';"
+    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云岛歌词</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-visual-mode="idle">
+    <main id="stage" class="island-stage">
+      <div id="mascot" class="mascot drag-region" aria-hidden="true">
+        <img src="../../assets/island-mascot.png" alt="">
+      </div>
+      <div id="island" class="island" aria-live="polite">
+      <div class="surface-glow"></div>
+
+      <section class="view idle-view" aria-label="等待网易云音乐">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="brand-ring"></span>
+          <span class="brand-core"></span>
+        </div>
+        <div class="idle-copy">
+          <strong>云岛歌词</strong>
+          <span id="idleMessage">等待网易云音乐</span>
+        </div>
+        <button id="idleDemoButton" class="text-button no-drag" type="button">预览</button>
+      </section>
+
+      <section class="view compact-view" aria-label="紧凑歌词">
+        <div id="compactArtworkButton" class="artwork compact-artwork drag-region" aria-hidden="true">
+          <img id="compactArtwork" alt="歌曲封面">
+          <span class="artwork-fallback" aria-hidden="true">
+            <span class="disc-groove"></span>
+            <span class="disc-center"></span>
+          </span>
+        </div>
+
+        <div id="compactContent" class="compact-content drag-region">
+          <span class="compact-meta">
+            <span class="status-dot"></span>
+            <strong id="compactTitle">等待歌曲</strong>
+            <span id="compactArtist"></span>
+          </span>
+          <span id="compactLyricViewport" class="compact-line-viewport compact-main-viewport">
+            <span class="compact-lyric-layer compact-lyric is-active" data-layer="0">正在连接网易云音乐…</span>
+            <span class="compact-lyric-layer compact-lyric" data-layer="1" aria-hidden="true"></span>
+          </span>
+          <span id="compactSublineViewport" class="compact-line-viewport compact-subline-viewport">
+            <span class="compact-subline-layer compact-subline is-active" data-layer="0"></span>
+            <span class="compact-subline-layer compact-subline" data-layer="1" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="compact-actions no-drag">
+          <button id="expandButton" class="icon-button" type="button" aria-label="展开歌词" title="展开歌词">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="view expanded-view" aria-label="展开歌词">
+        <header class="expanded-header">
+          <div class="artwork large-artwork" aria-hidden="true">
+            <img id="expandedArtwork" alt="">
+            <span class="artwork-fallback">
+              <span class="disc-groove"></span>
+              <span class="disc-center"></span>
+            </span>
+          </div>
+          <div class="track-copy">
+            <div class="track-heading">
+              <h1 id="expandedTitle">等待歌曲</h1>
+              <span id="demoBadge" class="demo-badge">DEMO</span>
+            </div>
+            <p><span id="expandedArtist"></span><span id="expandedAlbum"></span></p>
+            <div class="source-row">
+              <span id="playbackLabel" class="source-chip"><i></i>正在播放</span>
+              <span id="matchLabel" class="match-label">网易云歌词</span>
+            </div>
+          </div>
+          <div class="header-actions no-drag">
+            <button id="hideButton" class="icon-button" type="button" aria-label="隐藏到托盘" title="隐藏到托盘">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+            </button>
+            <button id="collapseButton" class="icon-button" type="button" aria-label="收起歌词" title="收起歌词">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"></path></svg>
+            </button>
+          </div>
+        </header>
+
+        <div id="lyricsViewport" class="lyrics-viewport" aria-label="同步歌词">
+          <div id="lyricsStackA" class="lyrics-stack is-active" data-layer="0"></div>
+          <div id="lyricsStackB" class="lyrics-stack" data-layer="1" aria-hidden="true"></div>
+          <div id="lyricsPlaceholder" class="lyrics-placeholder">
+            <span class="search-pulse"></span>
+            <strong id="placeholderTitle">正在寻找歌词</strong>
+            <span id="placeholderDetail">根据歌曲、歌手和时长自动匹配</span>
+          </div>
+        </div>
+
+        <footer class="expanded-footer no-drag">
+          <div class="timeline-row">
+            <time id="currentTime">0:00</time>
+            <div class="timeline-track" aria-hidden="true"><span id="timelineFill"></span></div>
+            <time id="durationTime">0:00</time>
+          </div>
+          <div class="tool-row">
+            <div class="offset-control" aria-label="歌词偏移">
+              <button id="offsetMinus" type="button" title="歌词提前 0.1 秒">−</button>
+              <button id="offsetValue" type="button" title="重置歌词偏移">同步 0.0s</button>
+              <button id="offsetPlus" type="button" title="歌词延后 0.1 秒">＋</button>
+            </div>
+            <div class="tool-spacer"></div>
+            <button id="translationButton" class="chip-button" type="button" aria-pressed="true" title="显示/隐藏翻译">译</button>
+            <button id="romanizationButton" class="chip-button" type="button" aria-pressed="false" title="显示/隐藏音译">音</button>
+            <button id="demoButton" class="chip-button" type="button" aria-pressed="false" title="切换演示模式">演示</button>
+            <button id="clickThroughButton" class="chip-button pointer-button" type="button" title="开启鼠标穿透">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 3.5 11 10-5.2.8 3.1 5.1-2.2 1.1-3-5.1-3.2 4.1z"></path></svg>
+              <span>穿透</span>
+            </button>
+          </div>
+        </footer>
+      </section>
+
+        <div id="toast" class="toast" role="status"></div>
+      </div>
+    </main>
+
+    <script src="playback-clock.js"></script>
+    <script src="lyric-scheduler.js"></script>
+    <script src="lyric-transition.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

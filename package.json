@@ -1,0 +1,69 @@
+{
+  "name": "netease-island-lyrics",
+  "version": "0.3.4",
+  "private": true,
+  "author": "Netease Island Lyrics contributors",
+  "license": "MIT",
+  "description": "A Dynamic Island-inspired desktop lyrics overlay for NetEase Cloud Music on Windows.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ars1027/netease-island-lyrics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Ars1027/netease-island-lyrics/issues"
+  },
+  "homepage": "https://github.com/Ars1027/netease-island-lyrics#readme",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "probe": "node scripts/probe-media.js",
+    "icons": "electron scripts/create-icons.js",
+    "test": "node --test",
+    "watcher": "node scripts/build-watcher.js",
+    "dist": "npm run watcher && electron-builder --win portable --x64"
+  },
+  "dependencies": {
+    "@coooookies/windows-smtc-monitor": "1.0.12"
+  },
+  "devDependencies": {
+    "electron": "43.1.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.codex.netease-island-lyrics",
+    "productName": "Netease Island Lyrics",
+    "electronDist": "node_modules/electron/dist",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "LICENSE",
+      "ASSETS_LICENSE.md",
+      "README.md",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/app-icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "NeteaseIslandLyrics-${version}-portable.${ext}"
+    },
+    "portable": {
+      "useZip": true
+    }
+  }
+}

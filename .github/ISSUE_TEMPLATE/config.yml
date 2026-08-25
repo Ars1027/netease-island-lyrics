@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 下载最新版本
+    url: https://github.com/Ars1027/netease-island-lyrics/releases/latest
+    about: 提交问题前请先确认最新版本是否已经修复。

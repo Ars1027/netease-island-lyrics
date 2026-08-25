@@ -1,0 +1,56 @@
+# Changelog
+
+本项目遵循语义化版本号；重要变更记录在此文件中。
+
+## [0.3.4] - 2026-08-25
+
+### Fixed
+
+- 修复 Electron 原生拖拽区无法触发 CSS `:hover`，导致只有展开箭头能触发透明效果的问题。
+- 改为按实际窗口 shape 命中人物与胶囊，透明舞台和圆角外不会误触。
+
+### Performance
+
+- 悬停监控仅在窗口可见、紧凑且没有尺寸动画时以 50ms 间隔运行。
+- 单一定时器配合代次校验，停止后旧回调不会复活，不会随运行时长累积。
+
+## [0.3.3] - 2026-08-25
+
+### Added
+
+- 水无月萤紧凑态悬停透明：进入 150ms 淡至 35%，离开 220ms 恢复。
+- 拖动期间 90ms 恢复完全清晰，减少动态效果模式下切换压缩至 1ms。
+
+## [0.3.2] - 2026-07-15
+
+### Added
+
+- 新增轻量原生网易云进程监听器，实现真正的“随网易云自动启动”。
+- 网易云完全退出后，监听器启动的 Electron 实例会完整释放。
+
+### Fixed
+
+- 修复部分 portable 环境下 SMTC 原生模块缺失问题。
+- 修复长时间运行时媒体轮询、封面 IPC 与计时器造成的 CPU/内存增长。
+
+## [0.3.0] - 2026-07-13
+
+### Added
+
+- 新增水无月萤探头人物、透明 Alpha 窗口形状与角色事件动画。
+- 删除封面持续旋转和常驻高刷 JS 循环，改为事件驱动渲染。
+- 封面只在实际变化时通过 IPC 传输。
+
+## [0.2.1] - 2026-07-12
+
+### Added
+
+- 紧凑态与展开态使用双层缓冲歌词动画。
+- 支持整句高亮、350ms 内部提前量、翻译/音译优先级和无闪烁 seek。
+- 加强置顶、透明窗口、拖动区域及网易云联动显示。
+
+[0.3.4]: https://github.com/Ars1027/netease-island-lyrics/releases/tag/v0.3.4
+[0.3.3]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.3...v0.3.4
+[0.3.2]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.2...v0.3.3
+[0.3.0]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.0...v0.3.2
+[0.2.1]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.2.1...v0.3.0
