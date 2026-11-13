@@ -51,10 +51,12 @@ function markTimelineObserved(sessions, sourceAppId, observedAt = Date.now()) {
 class MediaSessionProjector {
   constructor() {
     this.previousTrackKey = '';
+    this.previousThumbnail = null;
   }
 
   reset() {
     this.previousTrackKey = '';
+    this.previousThumbnail = null;
   }
 
   normalize(session) {
@@ -81,7 +83,18 @@ class MediaSessionProjector {
       positionPrecisionMs: Number.isInteger(position) ? 1000 : 1,
       trackKey,
     };
-    if (trackChanged) normalized.artwork = thumbnailToDataUrl(session?.media?.thumbnail);
+    if (trackChanged) this.previousThumbnail = null;
+    const thumbnail = session?.media?.thumbnail;
+    const buffer = thumbnail ? (Buffer.isBuffer(thumbnail) ? thumbnail : Buffer.from(thumbnail)) : null;
+    if (buffer?.length && !buffer.equals(this.previousThumbnail || Buffer.alloc(0))) {
+      const artwork = thumbnailToDataUrl(buffer);
+      if (artwork) {
+        normalized.artwork = artwork;
+        this.previousThumbnail = Buffer.from(buffer);
+      }
+    }
+    // An incomplete same-track media event must not erase a working cover.
+    if (trackChanged && !Object.hasOwn(normalized, 'artwork')) normalized.artwork = null;
     return normalized;
   }
 }

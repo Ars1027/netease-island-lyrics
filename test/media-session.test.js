@@ -47,6 +47,32 @@ test('thumbnail conversion rejects unknown formats', () => {
   assert.equal(thumbnailToDataUrl(Buffer.from('not-an-image')), null);
 });
 
+test('delayed and replaced same-track covers arrive without repeated image payloads', () => {
+  const projector = new MediaSessionProjector();
+  const current = session();
+  assert.equal(projector.normalize(current).artwork, null);
+  current.media.thumbnail = Buffer.from([0xff, 0xd8, 1]);
+  const firstCover = projector.normalize(current).artwork;
+  assert.match(firstCover, /^data:image\/jpeg;base64,/);
+  assert.equal(Object.hasOwn(projector.normalize(current), 'artwork'), false);
+  // Covers can be updated in the same Buffer as well as in a new Buffer.
+  current.media.thumbnail[2] = 2;
+  assert.notEqual(projector.normalize(current).artwork, firstCover);
+  current.media.thumbnail = null;
+  assert.equal(Object.hasOwn(projector.normalize(current), 'artwork'), false);
+  current.media.title = 'Next song';
+  assert.equal(projector.normalize(current).artwork, null);
+});
+
+test('reset re-emits the cover when a session reconnects', () => {
+  const projector = new MediaSessionProjector();
+  const current = session();
+  current.media.thumbnail = Buffer.from([0xff, 0xd8, 1]);
+  const artwork = projector.normalize(current).artwork;
+  projector.reset();
+  assert.equal(projector.normalize(current).artwork, artwork);
+});
+
 test('timeline events refresh the transport timestamp without another full native query', () => {
   const current = session({ lastUpdatedTime: 100 });
   assert.equal(markTimelineObserved([current], 'cloudmusic.exe', 12_345), true);

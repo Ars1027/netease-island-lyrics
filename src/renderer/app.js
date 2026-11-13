@@ -307,15 +307,17 @@ function handleLyrics(payload) {
     return;
   }
 
+  // Instrumental tracks can have artwork even when they have no lyric lines.
+  const artworkChanged = setArtwork(state.artworkUrl || getSongArtwork(payload?.data));
+  if (artworkChanged && state.media?.playbackStatus === 4) animateCover('track');
+
   if (state.lyricsStatus === 'ready' && state.lines.length > 0) {
     elements.matchLabel.textContent = payload.data?.song?.id
       ? `网易云歌词 · #${payload.data.song.id}`
       : '网易云歌词 · 已匹配';
     elements.lyricsViewport.classList.remove('is-placeholder', 'is-static');
-    const artworkChanged = setArtwork(state.artworkUrl || getSongArtwork(payload.data));
     renderCurrentLine(true);
     scheduleLyricBoundary();
-    if (artworkChanged && state.media?.playbackStatus === 4) animateCover('track');
     return;
   }
 

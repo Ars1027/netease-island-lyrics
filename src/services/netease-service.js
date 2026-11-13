@@ -15,7 +15,7 @@ const { parseLyricsPayload } = require('./lyrics-parser');
 const DEFAULT_BASE_URL = 'https://music.163.com';
 const SEARCH_PATH = '/api/search/get/web';
 const LYRIC_PATH = '/api/song/lyric';
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const DEFAULT_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 class NeteaseApiError extends Error {
@@ -463,9 +463,29 @@ class NeteaseService {
   async resolveLyrics(query, options = {}) {
     const song = await this.findBestSong(query, options);
     if (!song) return null;
-    const rawLyrics = await this.getLyrics(song.id, options);
+    const [rawLyrics, coverUrl] = await Promise.all([
+      this.getLyrics(song.id, options),
+      song.coverUrl ? Promise.resolve(song.coverUrl) : this.getSongCover(song.id, options),
+    ]);
+    song.coverUrl = coverUrl;
     const lyrics = parseLyricsPayload(rawLyrics, options.parserOptions || {});
     return { song, rawLyrics, lyrics };
+  }
+
+  async getSongCover(songId, options = {}) {
+    try {
+      const data = await this.requestJson('/api/song/detail/', {
+        id: songId,
+        ids: JSON.stringify([String(songId)]),
+      }, options);
+      const song = data?.songs?.find((entry) => String(entry.id) === String(songId));
+      // Do not derive URLs from numeric picId: large IDs lose precision in JSON.
+      const url = song ? normalizeSong(song).coverUrl : null;
+      return typeof url === 'string' ? url.replace(/^http:\/\//u, 'https://') : null;
+    } catch {
+      // Missing artwork must not turn successfully fetched lyrics into an error.
+      return null;
+    }
   }
 
   _cacheFile(cacheKey) {

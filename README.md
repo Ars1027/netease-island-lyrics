@@ -24,7 +24,7 @@
 </div>
 
 > [!NOTE]
-> 当前仓库发布的是水无月萤主题版 `v0.3.4`。应用不会注入或修改网易云音乐，播放信息来自 Windows 系统媒体会话（SMTC）。
+> 当前源码版本为水无月萤主题版 `v0.3.5`，已发布安装包见 Releases。应用不会注入或修改网易云音乐，播放信息来自 Windows 系统媒体会话（SMTC）。
 
 ## 界面预览
 
@@ -67,7 +67,7 @@
 ### 安装步骤
 
 1. 前往 [Releases](https://github.com/Ars1027/netease-island-lyrics/releases/latest)。
-2. 下载 `NeteaseIslandLyrics-0.3.4-portable.exe` 和同名 `.sha256` 文件。
+2. 下载 `NeteaseIslandLyrics-<版本号>-portable.exe` 和同名 `.sha256` 文件。
 3. 如果旧版本正在运行，请先从托盘菜单选择“退出”，再双击新版本。
 4. 打开网易云音乐并播放歌曲，云岛会出现在主屏幕顶部中央。
 
@@ -77,7 +77,7 @@
 验证文件：
 
 ```powershell
-(Get-FileHash .\NeteaseIslandLyrics-0.3.4-portable.exe -Algorithm SHA256).Hash
+(Get-FileHash .\NeteaseIslandLyrics-<版本号>-portable.exe -Algorithm SHA256).Hash
 ```
 
 发布页同时提供校验文件；两个哈希值必须完全一致。
@@ -153,6 +153,8 @@ flowchart LR
 - 媒体时间以 Windows 返回的位置和更新时间为锚，播放时平滑插值，暂停时冻结。
 - 歌词服务按歌名、歌手和时长综合消歧，并缓存 30 天。
 - 普通更新不会重复传输大体积 Base64 封面；切歌或封面变化时才发送。
+- 封面延迟到达时会补发；SMTC 缺少封面时，按匹配到的歌曲 ID 查询详情补取，纯音乐也可显示封面。
+- 封面接收保持事件驱动，不额外增加周期复查或切歌后的延时补查。
 - 悬停检测只在窗口可见且处于紧凑态时低频运行，隐藏、空闲、展开和退出都会彻底停止。
 
 ## 从源码运行
@@ -186,6 +188,12 @@ npm ci
 提交代码前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，并确保 `npm test` 全部通过。
 
 ## 常见问题
+
+<details>
+  <summary><strong>为什么最小化网易云后信息或封面不更新？</strong></summary>
+  <br>
+  云岛不依赖网易云窗口是否可见。切歌后延迟到达的 SMTC 封面会通过媒体事件补发，缺少封面时尝试歌曲详情图片，不额外定时复查。如果 Windows 媒体控制区域也没有最新歌曲，请先检查网易云或 BetterNCM SMTC 插件是否继续提供系统媒体信息。歌曲详情接口受网络、版权和接口可用性影响，无法保证所有歌曲均有封面。
+</details>
 
 <details>
   <summary><strong>一直显示“等待网易云音乐”怎么办？</strong></summary>

@@ -2,6 +2,19 @@
 
 本项目遵循语义化版本号；重要变更记录在此文件中。
 
+## [0.3.5] - 2026-11-13
+
+### Fixed
+
+- 修复切歌后延迟到达或发生变化的 SMTC 封面被忽略的问题，同曲临时空封面不会再清除已显示图片。
+- 搜索结果缺少封面时，按匹配的歌曲 ID 查询详情补取；无歌词歌曲也可显示备用封面。
+- 更新歌词缓存格式，避免旧版缺少封面地址的缓存继续阻碍补取。
+
+### Performance
+
+- 保持事件驱动，不新增周期复查或切歌后的延时补查；未变化的封面继续省略 Base64 转换和 IPC 传输。
+- 缺少搜索封面时才请求歌曲详情，获取的封面地址随歌词一起缓存。
+
 ## [0.3.4] - 2026-08-25
 
 ### Fixed
@@ -49,6 +62,7 @@
 - 支持整句高亮、350ms 内部提前量、翻译/音译优先级和无闪烁 seek。
 - 加强置顶、透明窗口、拖动区域及网易云联动显示。
 
+[0.3.5]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/Ars1027/netease-island-lyrics/releases/tag/v0.3.4
 [0.3.3]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.3...v0.3.4
 [0.3.2]: https://github.com/Ars1027/netease-island-lyrics/compare/v0.3.2...v0.3.3

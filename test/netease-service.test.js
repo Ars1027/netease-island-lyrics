@@ -182,7 +182,7 @@ test('resolveLyrics performs search, fetch and parsing without real network acce
   });
 
   const result = await service.resolveLyrics({ title: 'Song', artist: 'Artist', durationMs: 123000 });
-  assert.deepEqual(paths, ['/api/search/get/web', '/api/song/lyric']);
+  assert.deepEqual(paths, ['/api/search/get/web', '/api/song/lyric', '/api/song/detail/']);
   assert.equal(result.song.id, '42');
   assert.equal(result.lyrics.lines[0].text, 'Line');
   assert.equal(result.lyrics.lines[0].translation, '译文');
@@ -217,7 +217,7 @@ test('getLyricsForTrack accepts duration in seconds, exposes lines, and reuses m
   assert.equal(first.lines, first.lyrics.lines);
   assert.equal(first.lines[0].text, 'Line');
   assert.equal(second.lines[0].text, 'Line');
-  assert.equal(fetchCount, 2);
+  assert.equal(fetchCount, 3);
 });
 
 test('getLyricsForTrack can reuse optional disk cache across service instances', async () => {
@@ -265,4 +265,47 @@ test('service wraps HTTP and API failures and validates ids', async () => {
   );
 
   await assert.rejects(() => apiService.getLyrics('12abc'), /numeric NetEase song id/u);
+});
+
+test('missing search artwork is resolved by exact song id, cached, and supports instrumental tracks', async () => {
+  let details = 0;
+  const service = new NeteaseService({
+    fetch: async (url) => {
+      if (url.pathname.includes('search')) return jsonResponse({
+        code: 200, result: { songs: [{ id: 42, name: 'Song', ar: [{ name: 'Artist' }] }] },
+      });
+      if (url.pathname.includes('detail')) {
+        details += 1;
+        assert.equal(url.searchParams.get('ids'), '["42"]');
+        return jsonResponse({ code: 200, songs: [
+          { id: 99, al: { picUrl: 'https://wrong.jpg' } },
+          { id: 42, al: { picUrl: 'http://p1.music.126.net/cover.jpg' } },
+        ] });
+      }
+      return jsonResponse({ code: 200, nolyric: true });
+    },
+  });
+  const track = { title: 'Song', artist: 'Artist' };
+  const result = await service.getLyricsForTrack(track);
+  assert.equal(result.song.coverUrl, 'https://p1.music.126.net/cover.jpg');
+  assert.equal(result.lines.length, 0);
+  assert.equal((await service.getLyricsForTrack(track)).song.coverUrl, result.song.coverUrl);
+  assert.equal(details, 1);
+});
+
+test('artwork API failure does not discard lyrics and existing covers skip detail requests', async () => {
+  for (const coverUrl of [null, 'https://p1.music.126.net/existing.jpg']) {
+    let details = 0;
+    const service = new NeteaseService({ fetch: async (url) => {
+      if (url.pathname.includes('search')) return jsonResponse({
+        code: 200, result: { songs: [{ id: 42, name: 'Song', coverUrl }] },
+      });
+      if (url.pathname.includes('detail')) { details += 1; throw new Error('offline'); }
+      return jsonResponse({ code: 200, lrc: { lyric: '[00:01]Line' } });
+    } });
+    const result = await service.resolveLyrics({ title: 'Song' });
+    assert.equal(result.lyrics.lines[0].text, 'Line');
+    assert.equal(result.song.coverUrl, coverUrl);
+    assert.equal(details, coverUrl ? 0 : 1);
+  }
 });
