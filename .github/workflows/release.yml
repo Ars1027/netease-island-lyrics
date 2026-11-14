@@ -40,6 +40,11 @@ jobs:
           npm ci
           npm test
 
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
       - name: Validate tag
         shell: pwsh
         run: |

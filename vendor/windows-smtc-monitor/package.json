@@ -1,0 +1,9 @@
+{
+  "name": "@coooookies/windows-smtc-monitor",
+  "version": "1.0.12-local.1",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "files": ["*.js", "*.d.ts", "*.node", "LICENSE", "README.md"]
+}

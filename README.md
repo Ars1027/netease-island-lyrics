@@ -2,7 +2,7 @@
   <img src="assets/app-icon.png" width="96" alt="云岛歌词图标">
   <h1>云岛歌词</h1>
   <p><strong>给网易云音乐一座轻巧、流畅、始终在线的桌面歌词岛。</strong></p>
-  <p>Windows · Electron · SMTC · 水无月萤主题</p>
+  <p>Windows · Electron · SMTC · 可自定义角色</p>
 
   <p>
     <a href="https://github.com/Ars1027/netease-island-lyrics/releases/latest"><img src="https://img.shields.io/github/v/release/Ars1027/netease-island-lyrics?display_name=tag&sort=semver&style=flat-square&color=ff3158" alt="GitHub Release"></a>
@@ -24,7 +24,7 @@
 </div>
 
 > [!NOTE]
-> 当前源码版本为水无月萤主题版 `v0.3.5`，已发布安装包见 Releases。应用不会注入或修改网易云音乐，播放信息来自 Windows 系统媒体会话（SMTC）。
+> 当前源码版本为 `v0.3.6`，支持模块化角色，已发布安装包见 Releases。应用不会注入或修改网易云音乐，播放信息来自 Windows 系统媒体会话（SMTC）。
 
 ## 界面预览
 
@@ -55,6 +55,7 @@
 | 🚀 随网易云启动 | 登录后仅驻留轻量原生监听器；网易云出现时启动云岛，退出后释放 Electron 进程 |
 | 🪶 低占用 | 无常驻高刷 JS 循环、封面按事件传输、动画只使用 transform/opacity 合成层 |
 | 🖥️ 高刷动画 | 动画由显示器刷新率驱动，在 120/144Hz 屏幕上保持顺滑 |
+| 🎭 角色可换 | 默认无角色，可选择内置角色或导入自己的透明 PNG |
 
 ## 下载与安装
 
@@ -100,6 +101,33 @@
 - 点击右侧箭头展开完整歌词。
 - 鼠标停在人物或胶囊上时，整座岛会柔和淡出；开始拖动后恢复清晰。
 
+### 角色与展开态
+
+- 新安装默认不显示角色，升级时保留旧版有效的水无月萤设置。展开态角色按钮和等待页均可更换角色；托盘也提供快捷入口。可选“无角色”、水无月萤、水上由岐（校服）、水上由岐（黑裙），也可导入多个自定义角色并随时删除。
+- 自定义角色使用透明 PNG，文件不超过 10 MiB，尺寸不超过 4096×4096，且需要同时包含透明和可见像素。导入后会自动裁去透明边并等比缩放。
+- 自定义角色保存在 `%APPDATA%\Netease Island Lyrics\mascots`。
+- 展开歌词视图无需当前正在播放歌曲。等待时显示“云岛歌词 / 等待播放”和唱片装饰；音乐开始后歌词出现。
+- 鼠标穿透开启时，打开角色面板会临时解除穿透；关闭面板后恢复原状态。
+
+内置角色预览：
+
+| 角色 | 预览 |
+| --- | --- |
+| 水无月萤 | <img src="assets/island-mascot.png" width="160" alt="水无月萤预览"> |
+| 水上由岐（校服） | <img src="assets/mascots/yuki-school.png" width="160" alt="水上由岐校服预览"> |
+| 水上由岐（黑裙） | <img src="assets/mascots/yuki-black.png" width="160" alt="水上由岐黑裙预览"> |
+
+制作自定义角色 PNG 时，可以将项目现有的 [水无月萤 PNG](assets/island-mascot.png) 与目标角色立绘一起作为图生图参考；这样更容易保持相同的画风和探头姿态。通用提示词模板：
+
+> 以项目提供的水无月萤 PNG 为画风、构图和显示比例参考，以目标角色立绘为身份与服饰参考。绘制适配约 96×58 像素显示的 Q 版大头探头角色，只画头、肩和双手；双手搭在同一条底边上，人物姿势、边缘留白和视觉重心贴合项目参考图。匹配参考图的线条、配色和柔和质感。输出带真实 Alpha 透明通道的 PNG，人物清晰完整、不裁掉头发或手。只画角色，不画胶囊、桌面、文字、阴影背景或棋盘格。
+
+替换模板中的“目标角色立绘”为相应款式描述：
+
+- 校服款：水上由岐，棕发棕眼、侧辫、双银发夹与羽饰，黑色颈圈，白衬衫和红领带。
+- 黑裙款：水上由岐，保留参考立绘中的发型与饰品，黑色细肩带系带裙，银色十字项链。
+
+水上由岐校服立绘参考：[官方角色页](https://www.keroq.co.jp/suba_fhd/#chara_area) · [官方立绘图](https://www.keroq.co.jp/suba_fhd/img/chara/chara_slide/chara-01.png)。黑裙款参考：[转载图片](https://i0.hdslb.com/bfs/archive/22df0873f671e6b53dae08ab676e22823c82418b.jpg)。
+
 ### 展开态
 
 - 查看前后五行歌词、翻译/音译与播放时间轴。
@@ -130,7 +158,7 @@
 2. 下载并启动新版 EXE；原有位置、歌词偏移和显示设置会继续沿用。
 3. 前台运行一次后，网易云联动目标会自动更新到新路径。
 
-多个人物版本共享 App ID、设置目录、监听器与单实例锁，不能同时运行。
+所有预设角色都在同一个应用中选择，无需下载或同时运行不同人物版本。
 
 ### 卸载
 
@@ -159,13 +187,15 @@ flowchart LR
 
 ## 从源码运行
 
-需要 Windows 10 1809+、Node.js 18+。构建原生监听器还需要系统中的 .NET Framework C# 编译器。
+需要 Windows 10 1809+、Node.js 18+。构建原生监听器需要系统中的 .NET Framework C# 编译器；构建完整封面读取模块需要 Rust 和 MSVC 链接库（或项目缓存中的 xwin SDK）。
 
 ```powershell
 git clone https://github.com/Ars1027/netease-island-lyrics.git
 cd netease-island-lyrics
 npm ci
+npm run smtc     # 构建修复后的原生封面模块
 npm test
+npm run test:ui  # 使用隔离配置验证角色与无歌曲展开页
 npm start
 ```
 
@@ -175,6 +205,7 @@ npm start
 npm run demo      # 不依赖真实歌曲，预览完整交互
 npm run probe     # 检查本机 SMTC 会话
 npm run watcher   # 重新构建轻量原生监听器
+npm run smtc      # 构建并安装完整读流的 SMTC 模块
 npm run dist      # 构建 Windows x64 portable
 ```
 

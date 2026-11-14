@@ -27,6 +27,7 @@
           <strong>云岛歌词</strong>
           <span id="idleMessage">等待网易云音乐</span>
         </div>
+        <button id="idleExpandButton" class="icon-button no-drag" type="button" aria-label="展开歌词">⌄</button>
         <button id="idleDemoButton" class="text-button no-drag" type="button">预览</button>
       </section>
 
@@ -65,6 +66,7 @@
       <section class="view expanded-view" aria-label="展开歌词">
         <header class="expanded-header">
           <div class="artwork large-artwork" aria-hidden="true">
+            <img class="empty-brand" src="../../assets/app-icon.png" alt="">
             <img id="expandedArtwork" alt="">
             <span class="artwork-fallback">
               <span class="disc-groove"></span>
@@ -97,11 +99,16 @@
           <div id="lyricsStackB" class="lyrics-stack" data-layer="1" aria-hidden="true"></div>
           <div id="lyricsPlaceholder" class="lyrics-placeholder">
             <span class="search-pulse"></span>
+            <span class="empty-disc" aria-hidden="true"></span>
             <strong id="placeholderTitle">正在寻找歌词</strong>
-            <span id="placeholderDetail">根据歌曲、歌手和时长自动匹配</span>
+            <span id="placeholderDetail">根据歌曲、歌手和时长自动匹配</span><div class="empty-actions no-drag"><button id="emptyMascotButton" class="chip-button" type="button">更换角色</button><button id="emptyDemoButton" class="chip-button" type="button">预览效果</button></div>
           </div>
         </div>
 
+        <div id="mascotPanel" class="mascot-panel no-drag" hidden>
+          <div class="mascot-panel-heading"><strong>选择角色</strong><div class="mascot-panel-actions"><button id="mascotImportButton" class="chip-button" type="button">导入 PNG</button><button id="mascotCloseButton" class="text-button" type="button">返回歌词</button></div></div>
+          <div id="mascotGrid" class="mascot-grid"></div>
+        </div>
         <footer class="expanded-footer no-drag">
           <div class="timeline-row">
             <time id="currentTime">0:00</time>
@@ -115,6 +122,7 @@
               <button id="offsetPlus" type="button" title="歌词延后 0.1 秒">＋</button>
             </div>
             <div class="tool-spacer"></div>
+            <button id="mascotButton" class="chip-button" type="button" aria-pressed="false">角色</button>
             <button id="translationButton" class="chip-button" type="button" aria-pressed="true" title="显示/隐藏翻译">译</button>
             <button id="romanizationButton" class="chip-button" type="button" aria-pressed="false" title="显示/隐藏音译">音</button>
             <button id="demoButton" class="chip-button" type="button" aria-pressed="false" title="切换演示模式">演示</button>

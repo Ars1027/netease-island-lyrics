@@ -11,8 +11,11 @@ const {
   nativeImage,
   screen,
   Tray,
+  dialog,
 } = require('electron');
 const { ConfigStore } = require('./services/config-store');
+const { MascotStore } = require('./services/mascot-store');
+const { ISLAND_SIZES, MASCOT_TOP, resolveVisualMode, stageHeight, windowSize, anchoredBounds } = require('./services/overlay-layout');
 const {
   disableWatcherIntegration,
   enableWatcherIntegration,
@@ -31,20 +34,7 @@ const {
 app.setName('Netease Island Lyrics');
 app.setAppUserModelId('com.codex.netease-island-lyrics');
 
-const ISLAND_SIZES = Object.freeze({
-  idle: { width: 304, height: 54 },
-  compact: { width: 484, height: 82 },
-  expanded: { width: 584, height: 360 },
-});
-const MASCOT_STAGE_HEIGHT = 58;
 const MASCOT_SIZE = Object.freeze({ width: 96, height: 58 });
-const MASCOT_PATH = path.join(__dirname, '..', 'assets', 'island-mascot.png');
-const WINDOW_SIZES = Object.freeze(Object.fromEntries(
-  Object.entries(ISLAND_SIZES).map(([mode, size]) => [
-    mode,
-    { width: size.width, height: size.height + MASCOT_STAGE_HEIGHT },
-  ]),
-));
 const NATIVE_ANIMATION_FRAME_MS = 1000 / 120;
 const AUTO_HIDE_DELAY_MS = 2000;
 const MANAGED_EXIT_DELAY_MS = 2000;
@@ -90,7 +80,13 @@ let pendingShow = false;
 let pendingForegroundPortablePath = null;
 let preferredPortablePath = process.env.PORTABLE_EXECUTABLE_FILE || null;
 let foregroundLaunchPromoted = false;
-let mascotShape = null;
+let mascotStore = null;
+let selectedMascot = null;
+let windowStageHeight = 0;
+let mascotPanelOpen = false;
+let importingMascot = false;
+let mascotAnimating = false;
+let mascotRestOffset = 0;
 let activeWindowShape = [];
 let windowHoverMonitor = null;
 const backgroundLaunch = process.argv.includes('--background');
@@ -139,6 +135,47 @@ function currentSettings() {
   return configStore.get();
 }
 
+function settingsState(settings = currentSettings()) {
+  return {
+    ...settings, visualMode, demoEnabled,
+    clickThrough: mascotPanelOpen ? false : settings.clickThrough,
+    mascotStageHeight: windowStageHeight,
+    selectedMascot: selectedMascot && { id: selectedMascot.id, image: selectedMascot.image },
+    mascotPanelOpen,
+  };
+}
+
+function mascotState() {
+  return { items: mascotStore.list().map(({ shape, ...card }) => card),
+    selectedId: currentSettings().mascotId, panelOpen: mascotPanelOpen };
+}
+
+function broadcastMascots() {
+  send('settings:state', settingsState());
+  const payload = mascotState();
+  send('mascots:state', payload);
+  return payload;
+}
+
+function selectMascot(id) {
+  const item = mascotStore.get(id);
+  if (!item || (id !== 'none' && !item.image)) throw new Error('角色图片不存在或无法读取');
+  configStore.updateStrict({ mascotId: id });
+  selectedMascot = item;
+  setVisualMode(visualMode, { force: true });
+  return broadcastMascots();
+}
+
+function setMascotPanel(open) {
+  mascotPanelOpen = Boolean(open);
+  if (mascotPanelOpen) {
+    setUserMode('expanded');
+    showOverlay();
+  }
+  setClickThrough(currentSettings().clickThrough, { persist: false, notify: false });
+  broadcastMascots();
+}
+
 function applyTopmost() {
   if (!mainWindow || mainWindow.isDestroyed() || !configStore) return;
   const enabled = currentSettings().topmostMode === 'fullscreen';
@@ -169,6 +206,7 @@ function showOverlay(options = {}) {
 
 function hideOverlay(options = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mascotPanelOpen) setMascotPanel(false);
   clearTimeout(autoHideTimer);
   pendingShow = false;
   if (options.manual) {
@@ -183,7 +221,7 @@ function hideOverlay(options = {}) {
 function scheduleAutoHide() {
   clearTimeout(autoHideTimer);
   const settings = currentSettings();
-  if (!settings.autoShowWithNetease || manualVisibilityOverride) return;
+  if (!settings.autoShowWithNetease || manualVisibilityOverride || settings.mode === 'expanded') return;
   autoHideTimer = setTimeout(() => hideOverlay(), AUTO_HIDE_DELAY_MS);
 }
 
@@ -237,7 +275,7 @@ function handleNetEaseProcessChange(running) {
 
   if (neteaseProcessRunning) {
     clearManagedExit();
-    if (!latestMedia && visualMode !== 'idle') setVisualMode('idle');
+    if (!latestMedia) setVisualMode(resolveVisualMode(currentSettings().mode, false));
     if (!manuallyHidden) showOverlay();
     return;
   }
@@ -409,27 +447,22 @@ function defaultBounds(size) {
 
 function initialBounds() {
   const settings = currentSettings();
-  const size = WINDOW_SIZES.idle;
+  visualMode = resolveVisualMode(settings.mode, false);
+  windowStageHeight = stageHeight(visualMode, Boolean(selectedMascot?.image));
+  const size = windowSize(visualMode, Boolean(selectedMascot?.image));
   if (!settings.position) return defaultBounds(size);
   return clampBounds({
-    x: settings.position.x,
-    y: settings.position.y - MASCOT_STAGE_HEIGHT,
+    x: settings.position.x + Math.round(((settings.positionWidth || size.width) - size.width) / 2),
+    y: settings.position.y - windowStageHeight,
     ...size,
   });
 }
 
 function targetBoundsForMode(mode) {
-  const size = WINDOW_SIZES[mode] || WINDOW_SIZES.compact;
+  const hasMascot = Boolean(selectedMascot?.image);
+  const size = windowSize(mode, hasMascot);
   if (!mainWindow) return defaultBounds(size);
-
-  const current = mainWindow.getBounds();
-  const target = {
-    width: size.width,
-    height: size.height,
-    x: Math.round(current.x + (current.width - size.width) / 2),
-    y: current.y,
-  };
-  return clampBounds(target);
+  return clampBounds(anchoredBounds(mainWindow.getBounds(), windowStageHeight, mode, hasMascot));
 }
 
 function roundedWindowShape(width, height, radius, offsetY = 0) {
@@ -450,42 +483,14 @@ function roundedWindowShape(width, height, radius, offsetY = 0) {
   return rectangles;
 }
 
-function loadMascotShape() {
-  if (mascotShape) return mascotShape;
-  const image = nativeImage.createFromPath(MASCOT_PATH).resize({
-    width: MASCOT_SIZE.width,
-    height: MASCOT_SIZE.height,
-    quality: 'best',
-  });
-  if (image.isEmpty()) return [];
-
-  const bitmap = image.toBitmap();
-  const rectangles = [];
-  for (let y = 0; y < MASCOT_SIZE.height; y += 1) {
-    let runStart = -1;
-    for (let x = 0; x <= MASCOT_SIZE.width; x += 1) {
-      const alpha = x < MASCOT_SIZE.width
-        ? bitmap[((y * MASCOT_SIZE.width + x) * 4) + 3]
-        : 0;
-      if (alpha >= 16 && runStart < 0) runStart = x;
-      if ((alpha < 16 || x === MASCOT_SIZE.width) && runStart >= 0) {
-        rectangles.push({ x: runStart, y, width: x - runStart, height: 1 });
-        runStart = -1;
-      }
-    }
-  }
-  mascotShape = rectangles;
-  return mascotShape;
-}
-
 function mascotWindowShape(windowWidth) {
   const offsetX = Math.round((windowWidth - MASCOT_SIZE.width) / 2);
-  return [-5, 0, 2, 3].flatMap((offsetY) => loadMascotShape()
-    .filter((rectangle) => rectangle.y + offsetY >= 0)
+  const offsets = mascotAnimating ? [-5, -4, -3, -2, -1, 0, 1, 2, 3] : [mascotRestOffset];
+  return offsets.flatMap((offsetY) => (selectedMascot?.shape || [])
     .map((rectangle) => ({
       ...rectangle,
       x: rectangle.x + offsetX,
-      y: rectangle.y + offsetY,
+      y: rectangle.y + MASCOT_TOP + offsetY,
     })));
 }
 
@@ -493,8 +498,8 @@ function applyWindowShape() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const { width, height } = mainWindow.getBounds();
   const radius = visualMode === 'expanded' ? 30 : 34;
-  const islandHeight = Math.max(1, height - MASCOT_STAGE_HEIGHT);
-  const shape = roundedWindowShape(width, islandHeight, radius, MASCOT_STAGE_HEIGHT);
+  const islandHeight = Math.max(1, height - windowStageHeight);
+  const shape = roundedWindowShape(width, islandHeight, radius, windowStageHeight);
   if (visualMode === 'compact') shape.push(...mascotWindowShape(width));
   activeWindowShape = shape;
   if (typeof mainWindow.setShape === 'function') mainWindow.setShape(shape);
@@ -555,12 +560,16 @@ function animateBounds(target, duration = 190) {
 }
 
 function setVisualMode(mode, options = {}) {
-  const allowedMode = Object.hasOwn(WINDOW_SIZES, mode) ? mode : 'compact';
+  const allowedMode = Object.hasOwn(ISLAND_SIZES, mode) ? mode : 'compact';
   if (visualMode === allowedMode && !options.force) return;
+  const target = targetBoundsForMode(allowedMode);
   visualMode = allowedMode;
-  animateBounds(targetBoundsForMode(allowedMode), options.instant ? 0 : 190);
+  mascotAnimating = false;
+  mascotRestOffset = latestMedia && latestMedia.playbackStatus !== 4 ? 2 : 0;
+  windowStageHeight = stageHeight(allowedMode, Boolean(selectedMascot?.image));
+  animateBounds(target, options.instant ? 0 : 190);
   applyTopmost();
-  send('settings:state', { ...currentSettings(), visualMode, demoEnabled });
+  send('settings:state', settingsState());
   syncWindowHoverMonitoring();
 }
 
@@ -570,7 +579,10 @@ function savePositionSoon() {
   positionSaveTimer = setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed() || isAnimatingBounds) return;
     const { x, y } = mainWindow.getBounds();
-    configStore.update({ position: { x, y: y + MASCOT_STAGE_HEIGHT } });
+    configStore.update({
+      position: { x, y: y + windowStageHeight },
+      positionWidth: ISLAND_SIZES[visualMode].width,
+    });
   }, 250);
 }
 
@@ -737,7 +749,7 @@ function setAutoShowWithNetease(enabled) {
   }
   if (settings.autoShowWithNetease && latestMedia && !manuallyHidden) showOverlay();
   if (settings.autoShowWithNetease && !latestMedia) scheduleAutoHide();
-  send('settings:state', { ...settings, visualMode, demoEnabled });
+  send('settings:state', settingsState(settings));
   buildTrayMenu();
   return settings;
 }
@@ -745,7 +757,7 @@ function setAutoShowWithNetease(enabled) {
 function setTopmostMode(enabled) {
   const settings = configStore.update({ topmostMode: enabled ? 'fullscreen' : 'off' });
   applyTopmost();
-  send('settings:state', { ...settings, visualMode, demoEnabled });
+  send('settings:state', settingsState(settings));
   buildTrayMenu();
 }
 
@@ -765,6 +777,7 @@ function buildTrayMenu() {
       label: settings.mode === 'expanded' ? '收起歌词' : '展开歌词',
       click: () => setUserMode(settings.mode === 'expanded' ? 'compact' : 'expanded'),
     },
+    { label: '更换角色', click: () => setMascotPanel(true) },
     { type: 'separator' },
     {
       label: '随网易云自动启动',
@@ -820,19 +833,27 @@ function createTray() {
 function setUserMode(mode) {
   if (!['compact', 'expanded'].includes(mode)) return;
   configStore.update({ mode });
-  if (latestMedia) setVisualMode(mode);
-  send('settings:state', { ...currentSettings(), visualMode, demoEnabled });
+  if (mode !== 'expanded' && mascotPanelOpen) setMascotPanel(false);
+  setVisualMode(resolveVisualMode(mode, Boolean(latestMedia)));
+  if (mode === 'expanded') {
+    clearTimeout(autoHideTimer);
+    manuallyHidden = false;
+    showOverlay();
+  }
+  else if (!latestMedia) scheduleAutoHide();
+  send('settings:state', settingsState());
   buildTrayMenu();
 }
 
 function setClickThrough(enabled, options = {}) {
-  const value = Boolean(enabled);
-  if (options.persist !== false) configStore.update({ clickThrough: value });
+  const requested = Boolean(enabled);
+  if (options.persist !== false) configStore.update({ clickThrough: requested });
+  const value = mascotPanelOpen ? false : requested;
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.setIgnoreMouseEvents(value, { forward: true });
     mainWindow.setFocusable(!value);
   }
-  send('settings:state', { ...currentSettings(), clickThrough: value, visualMode, demoEnabled });
+  send('settings:state', settingsState());
   if (value && options.notify !== false) {
     send('ui:toast', '已开启鼠标穿透 · Ctrl + Alt + L 解锁');
   }
@@ -841,9 +862,10 @@ function setClickThrough(enabled, options = {}) {
 
 function resetPosition() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const target = defaultBounds(WINDOW_SIZES[visualMode] || WINDOW_SIZES.compact);
+  const target = defaultBounds(windowSize(visualMode, Boolean(selectedMascot?.image)));
   configStore.update({
-    position: { x: target.x, y: target.y + MASCOT_STAGE_HEIGHT },
+    position: { x: target.x, y: target.y + windowStageHeight },
+    positionWidth: ISLAND_SIZES[visualMode].width,
   });
   animateBounds(target);
   showOverlay({ manual: true });
@@ -857,7 +879,8 @@ function sendMedia(media) {
     latestLyrics = { status: 'idle', trackKey: null, data: null };
     send('media:state', null);
     send('lyrics:state', latestLyrics);
-    setVisualMode('idle');
+    activeLyricsRequest += 1;
+    setVisualMode(resolveVisualMode(currentSettings().mode, false));
     updateNetEaseProcessWatcher();
     scheduleAutoHide();
     return;
@@ -979,8 +1002,7 @@ function startDemo() {
 function stopDemo() {
   clearInterval(demoTimer);
   demoTimer = null;
-  latestMedia = null;
-  latestArtwork = null;
+  sendMedia(null);
 }
 
 function toggleDemo() {
@@ -994,7 +1016,7 @@ function toggleDemo() {
       if (!readWatcherState()) checkNetEaseStateFallback(watcherStateMonitoringGeneration);
     }
   }
-  send('settings:state', { ...currentSettings(), visualMode, demoEnabled });
+  send('settings:state', settingsState());
   buildTrayMenu();
 }
 
@@ -1017,10 +1039,56 @@ function updateLoginItemSetting(enabled, targetPathOverride = null) {
 }
 
 function registerIpc() {
+  function handleMascot(channel, handler) {
+    ipcMain.handle(channel, async (event, ...args) => {
+      if (!isTrustedIpcEvent(event)) throw new Error('不可信的请求来源');
+      try { return await handler(...args); }
+      catch (error) { notify(error.message); throw error; }
+    });
+  }
+  handleMascot('mascots:list', () => mascotState());
+  handleMascot('mascots:select', (id) => selectMascot(id));
+  handleMascot('mascots:import', async () => {
+    if (importingMascot) return null;
+    importingMascot = true;
+    try {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: '导入透明 PNG 角色', filters: [{ name: '透明 PNG', extensions: ['png'] }],
+        properties: ['openFile'],
+      });
+      if (result.canceled || !result.filePaths.length) return null;
+      const item = mascotStore.importFile(result.filePaths[0]);
+      try { return selectMascot(item.id); }
+      catch (error) { mascotStore.remove(item.id); throw error; }
+    } finally { importingMascot = false; }
+  });
+  handleMascot('mascots:remove', (id) => {
+    const item = mascotStore.get(id);
+    if (!item || item.builtin) throw new Error('只能删除自定义角色');
+    const selected = currentSettings().mascotId === id;
+    if (selected) configStore.updateStrict({ mascotId: 'none' });
+    try { mascotStore.remove(id); }
+    catch (error) {
+      if (selected) configStore.updateStrict({ mascotId: id });
+      throw error;
+    }
+    if (selected) {
+      selectedMascot = mascotStore.get('none');
+      setVisualMode(visualMode, { force: true });
+    }
+    return broadcastMascots();
+  });
+  onTrustedIpc('mascots:panel', (_event, open) => setMascotPanel(open));
+  onTrustedIpc('mascots:motion', (_event, motion) => {
+    mascotAnimating = Boolean(motion?.active) && visualMode === 'compact';
+    mascotRestOffset = motion?.offset === 2 ? 2 : 0;
+    if (!isAnimatingBounds) applyWindowShape();
+  });
   onTrustedIpc('ui:ready', () => {
     rendererReady = true;
     send('app:init', {
-      settings: currentSettings(),
+      settings: settingsState(),
+      mascots: mascotState(),
       visualMode,
       demoEnabled,
       media: mediaForInitialization(latestMedia, latestArtwork),
@@ -1050,11 +1118,12 @@ function registerIpc() {
     } else if (Object.hasOwn(normalizedPatch, 'launchAtLogin')) {
       requestedAutoShow = Boolean(normalizedPatch.launchAtLogin);
     }
+    delete normalizedPatch.mascotId;
     delete normalizedPatch.autoShowWithNetease;
     delete normalizedPatch.launchAtLogin;
     const settings = configStore.update(normalizedPatch);
     if (settings.clickThrough !== previous.clickThrough) setClickThrough(settings.clickThrough, { persist: false });
-    if (settings.mode !== previous.mode && latestMedia) setVisualMode(settings.mode);
+    if (settings.mode !== previous.mode) setUserMode(settings.mode);
     if (settings.acceptAnyMedia !== previous.acceptAnyMedia) {
       mediaWorker?.postMessage({ type: 'settings', acceptAnyMedia: settings.acceptAnyMedia });
     }
@@ -1063,7 +1132,7 @@ function registerIpc() {
       setAutoShowWithNetease(requestedAutoShow);
       return;
     }
-    send('settings:state', { ...settings, visualMode, demoEnabled });
+    send('settings:state', settingsState(settings));
     buildTrayMenu();
   });
 }
@@ -1180,6 +1249,15 @@ app.on('second-instance', (_event, commandLine, _workingDirectory, additionalDat
 
 app.whenReady().then(() => {
   configStore = new ConfigStore(app.getPath('userData'));
+  mascotStore = new MascotStore({
+    userDataPath: app.getPath('userData'), assetsPath: path.join(__dirname, '..', 'assets'), nativeImage,
+  });
+  selectedMascot = mascotStore.get(currentSettings().mascotId);
+  if (!selectedMascot || (selectedMascot.id !== 'none' && !selectedMascot.image)) {
+    configStore.update({ mascotId: 'none' });
+    selectedMascot = mascotStore.get('none');
+    notify('所选角色图片缺失，已切换为无角色');
+  }
   lyricsService = new NetEaseService({ cacheDir: path.join(app.getPath('userData'), 'lyrics-cache') });
   let managedCleanupFailed = false;
   let staleManagedExitRequested = false;

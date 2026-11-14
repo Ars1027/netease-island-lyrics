@@ -17,6 +17,11 @@ The JavaScript implementation in this project is original and does not bundle th
 - License: MIT
 - Source: https://github.com/leaguetavern/node-windows-smtc-monitor
 
+This application includes a locally maintained copy of npm 1.0.12, upstream
+revision `0e8b27a6ed739419881902b5e3e0fa751ee765ef`. The thumbnail stream reader
+was modified to read the complete stream instead of truncating it at 1 MiB.
+The upstream MIT license is retained in `vendor/windows-smtc-monitor/LICENSE`.
+
 ```text
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

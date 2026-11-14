@@ -1,6 +1,6 @@
 {
   "name": "netease-island-lyrics",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "author": "Netease Island Lyrics contributors",
   "license": "MIT",
@@ -20,11 +20,13 @@
     "probe": "node scripts/probe-media.js",
     "icons": "electron scripts/create-icons.js",
     "test": "node --test",
+    "test:ui": "electron scripts/check-mascots.js",
     "watcher": "node scripts/build-watcher.js",
-    "dist": "npm run watcher && electron-builder --win portable --x64"
+    "smtc": "node scripts/build-smtc.js",
+    "dist": "npm run smtc && npm run watcher && electron-builder --win portable --x64"
   },
   "dependencies": {
-    "@coooookies/windows-smtc-monitor": "1.0.12"
+    "@coooookies/windows-smtc-monitor": "file:vendor/windows-smtc-monitor"
   },
   "devDependencies": {
     "electron": "43.1.0",

@@ -173,7 +173,8 @@ function animateMascot(reason, isPlaying) {
   state.mascotAnimation?.cancel();
   state.mascotAnimation = null;
   elements.mascot.classList.toggle('is-paused', !isPlaying);
-  if (state.visualMode !== 'compact' || document.hidden || prefersReducedMotion()) return;
+  api.setMascotMotion({ active: false, offset: isPlaying ? 0 : 2 });
+  if (!state.settings.selectedMascot?.image || state.visualMode !== 'compact' || document.hidden || prefersReducedMotion()) return;
 
   const keyframes = reason === 'track'
     ? [
@@ -193,10 +194,18 @@ function animateMascot(reason, isPlaying) {
         { transform: 'translate3d(0, 3px, 0)' },
         { transform: 'translate3d(0, 2px, 0)' },
       ]);
-  state.mascotAnimation = elements.mascot.animate(keyframes, {
+  api.setMascotMotion({ active: true, offset: isPlaying ? 0 : 2 });
+  const animation = elements.mascot.animate(keyframes, {
     duration: reason === 'track' ? 480 : 300,
     easing: 'cubic-bezier(.22,.61,.36,1)',
   });
+  state.mascotAnimation = animation;
+  const finish = () => {
+    if (state.mascotAnimation !== animation) return;
+    state.mascotAnimation = null;
+    api.setMascotMotion({ active: false, offset: isPlaying ? 0 : 2 });
+  };
+  animation.finished.then(finish, finish);
 }
 
 function getSongArtwork(data) {
@@ -234,10 +243,11 @@ function handleMedia(media) {
     clearLyricRows();
     showCompactMessage('正在连接网易云音乐…', '');
     elements.idleMessage.textContent = '等待网易云音乐';
-    setVisualMode('idle');
+    renderEmptyMedia();
     return;
   }
 
+  elements.body.classList.remove('is-empty-media');
   const wasPlaying = state.media?.playbackStatus === 4;
   anchorClock(media);
   const trackChanged = media.trackKey !== state.media?.trackKey;
@@ -269,7 +279,7 @@ function handleMedia(media) {
     setArtwork(getSongArtwork(state.lyricData));
   }
 
-  if (state.visualMode === 'idle') setVisualMode(state.settings.mode || 'compact');
+
   if (state.lines.length > 0) renderCurrentLine();
   updateTimeline();
   scheduleLyricBoundary();
@@ -293,6 +303,7 @@ function setPlaceholder(title, detail, isStatic = false) {
 }
 
 function handleLyrics(payload) {
+  if (!state.media) { renderEmptyMedia(); return; }
   state.lyricsStatus = payload?.status || 'idle';
   state.lyricData = payload?.data || null;
   state.lines = normalizeLyricData(payload?.data);
@@ -657,7 +668,7 @@ function updateTimeline(now = performance.now()) {
   if (state.visualMode !== 'expanded') return;
   const positionSeconds = projectedPlaybackPositionMs(now) / 1000;
   const duration = Number(state.media?.duration || 0);
-  elements.currentTime.textContent = formatTime(positionSeconds);
+  elements.currentTime.textContent = state.media ? formatTime(positionSeconds) : '--:--';
   elements.timelineFill.style.width = `${duration > 0 ? clamp(positionSeconds / duration, 0, 1) * 100 : 0}%`;
 }
 
@@ -718,6 +729,9 @@ function updateSettings(settings) {
   state.demoEnabled = Boolean(settings.demoEnabled ?? state.demoEnabled);
   if (settings.visualMode) setVisualMode(settings.visualMode);
   elements.body.classList.toggle('is-demo', state.demoEnabled);
+  document.documentElement.style.setProperty('--mascot-stage-height', `${Number(state.settings.mascotStageHeight) || 0}px`);
+  if (Object.hasOwn(settings, 'selectedMascot')) renderSelectedMascot(settings.selectedMascot);
+  if (Object.hasOwn(settings, 'mascotPanelOpen')) renderMascotPanel({ ...mascotData, panelOpen: settings.mascotPanelOpen });
   elements.island.style.setProperty('--island-opacity', String(state.settings.opacity || 0.94));
   elements.translationButton.setAttribute('aria-pressed', String(Boolean(state.settings.showTranslation)));
   elements.romanizationButton.setAttribute('aria-pressed', String(Boolean(state.settings.showRomanization)));
@@ -745,6 +759,11 @@ function changeOffset(delta) {
 }
 
 function bindInteractions() {
+  document.querySelector('#idleExpandButton').addEventListener('click', () => api.setMode('expanded'));
+  for (const id of ['mascotButton', 'emptyMascotButton']) document.querySelector(`#${id}`).addEventListener('click', () => api.setMascotPanel(!mascotData.panelOpen));
+  document.querySelector('#mascotCloseButton').addEventListener('click', () => api.setMascotPanel(false));
+  document.querySelector('#mascotImportButton').addEventListener('click', () => api.importMascot().then(renderMascotPanel).catch(error => showToast(error.message)));
+  document.querySelector('#emptyDemoButton').addEventListener('click', () => api.toggleDemo());
   elements.expandButton.addEventListener('click', () => api.setMode('expanded'));
   elements.collapseButton.addEventListener('click', () => api.setMode('compact'));
   elements.hideButton.addEventListener('click', () => api.hide());
@@ -768,10 +787,77 @@ function bindInteractions() {
   });
   elements.clickThroughButton.addEventListener('click', () => api.setClickThrough(true));
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && state.visualMode === 'expanded') api.setMode('compact');
+    if (event.key !== 'Escape') return;
+    if (mascotData.panelOpen) api.setMascotPanel(false);
+    else if (state.visualMode === 'expanded') api.setMode('compact');
   });
 }
 
+let mascotData = { items: [], selectedId: 'none', panelOpen: false };
+function renderEmptyMedia() {
+  state.lyricData = null;
+  state.lyricsStatus = 'idle';
+  elements.body.classList.remove('is-playing');
+  elements.body.classList.add('is-empty-media');
+  elements.expandedTitle.textContent = '云岛歌词';
+  elements.expandedArtist.textContent = '';
+  elements.expandedAlbum.textContent = '';
+  elements.playbackLabel.lastChild.textContent = '等待播放';
+  elements.matchLabel.textContent = '';
+  elements.currentTime.textContent = '--:--';
+  elements.durationTime.textContent = '--:--';
+  elements.timelineFill.style.width = '0%';
+  setPlaceholder('音乐响起，歌词就会在这里出现。', '打开网易云音乐，播放任意歌曲。', true);
+}
+function renderSelectedMascot(item) {
+  state.settings.selectedMascot = item;
+  state.mascotAnimation?.cancel();
+  state.mascotAnimation = null;
+  api.setMascotMotion({ active: false, offset: elements.mascot.classList.contains('is-paused') ? 2 : 0 });
+  const image = elements.mascot.querySelector('img');
+  elements.mascot.hidden = !item?.image;
+  if (item?.image) image.src = item.image;
+  else image.removeAttribute('src');
+}
+function renderMascotPanel(payload) {
+  if (!payload) return;
+  mascotData = payload;
+  const panel = document.querySelector('#mascotPanel');
+  panel.hidden = !payload.panelOpen;
+  elements.lyricsViewport.hidden = Boolean(payload.panelOpen);
+  document.querySelector('#mascotButton').setAttribute('aria-pressed', String(Boolean(payload.panelOpen)));
+  document.querySelector('#clickThroughButton').disabled = Boolean(payload.panelOpen);
+  const grid = document.querySelector('#mascotGrid');
+  grid.replaceChildren();
+  const items = [{ id: 'none', name: '无角色' }, ...(payload.items || []).filter(item => item.id !== 'none')];
+  for (const item of items) {
+    const card = document.createElement('div');
+    card.className = 'mascot-card';
+    const select = document.createElement('button');
+    select.type = 'button';
+    select.setAttribute('aria-pressed', String(item.id === payload.selectedId));
+    const preview = document.createElement('div');
+    preview.className = 'mascot-card-preview';
+    if (item.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = '';
+      preview.append(img);
+    } else preview.classList.add('is-none');
+    select.append(preview);
+    const label = document.createElement('span');
+    label.textContent = item.name || '自定义角色';
+    label.title = label.textContent;
+    select.append(label);
+    select.addEventListener('click', () => api.selectMascot(item.id).then(renderMascotPanel).catch(error => showToast(error.message)));
+    card.append(select);
+    if (item.custom || item.type === 'custom' || item.id.startsWith('custom')) {
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '删除'; remove.className = 'mascot-delete';
+      remove.addEventListener('click', () => api.removeMascot(item.id).then(renderMascotPanel).catch(error => showToast(error.message))); card.append(remove);
+    }
+    grid.append(card);
+  }
+}
 function initialize() {
   ensureLyricRows();
   state.transitionController = new TransitionController(createTransitionAdapter());
@@ -786,9 +872,12 @@ function initialize() {
   api.onInit((payload) => {
     state.demoEnabled = Boolean(payload.demoEnabled);
     updateSettings({ ...payload.settings, visualMode: payload.visualMode, demoEnabled: payload.demoEnabled });
+    if (payload.mascots) renderMascotPanel(payload.mascots);
     handleMedia(payload.media);
     handleLyrics(payload.lyrics);
   });
+  api.onMascots?.(renderMascotPanel);
+  api.getMascots?.().then(renderMascotPanel).catch(() => {});
   api.onMedia(handleMedia);
   api.onLyrics(handleLyrics);
   api.onSettings(updateSettings);

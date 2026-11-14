@@ -10,8 +10,8 @@ const {
   sanitizeSettings,
 } = require('../src/services/config-store');
 
-test('version 4 defaults enable watcher-based NetEase linkage and fullscreen topmost', () => {
-  assert.equal(DEFAULT_SETTINGS.settingsVersion, 4);
+test('version 5 defaults enable watcher-based NetEase linkage and fullscreen topmost', () => {
+  assert.equal(DEFAULT_SETTINGS.settingsVersion, 5);
   assert.equal(DEFAULT_SETTINGS.launchAtLogin, true);
   assert.equal(DEFAULT_SETTINGS.autoShowWithNetease, true);
   assert.equal(DEFAULT_SETTINGS.topmostMode, 'fullscreen');
@@ -24,7 +24,7 @@ test('version 1 settings migrate once and reset obsolete manual sync compensatio
     launchAtLogin: false,
     lyricOffsetMs: -1400,
   });
-  assert.equal(migrated.settingsVersion, 4);
+  assert.equal(migrated.settingsVersion, 5);
   assert.equal(migrated.mode, 'expanded');
   assert.equal(migrated.launchAtLogin, true);
   assert.equal(migrated.autoShowWithNetease, true);
@@ -54,7 +54,7 @@ test('version 3 upgrade preserves the existing watcher choice and lyric offset',
     lyricOffsetMs: -1300,
     showRomanization: true,
   });
-  assert.equal(settings.settingsVersion, 4);
+  assert.equal(settings.settingsVersion, 5);
   assert.equal(settings.launchAtLogin, false);
   assert.equal(settings.autoShowWithNetease, false);
   assert.equal(settings.lyricOffsetMs, -1300);
@@ -67,7 +67,7 @@ test('version 2 position migrates as the island anchor without shifting', () => 
     position: { x: 720, y: 24 },
     mode: 'compact',
   });
-  assert.equal(settings.settingsVersion, 4);
+  assert.equal(settings.settingsVersion, 5);
   assert.deepEqual(settings.position, { x: 720, y: 24 });
 });
 
@@ -83,4 +83,12 @@ test('strict settings updates roll memory back when persistence fails', () => {
   } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
+});
+
+
+test('mascot defaults and migration preserve existing users', () => {
+  assert.equal(DEFAULT_SETTINGS.mascotId, 'none');
+  assert.equal(migrateSettings({settingsVersion:4}).mascotId, 'hotaru');
+  assert.equal(migrateSettings({settingsVersion:5,mascotId:'none'}).mascotId, 'none');
+  assert.equal(sanitizeSettings({mascotId:'../../escape'}).mascotId, 'none');
 });

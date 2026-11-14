@@ -2,7 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const DEFAULT_SETTINGS = Object.freeze({
-  settingsVersion: 4,
+  settingsVersion: 5,
+  mascotId: 'none',
   mode: 'compact',
   clickThrough: false,
   showTranslation: true,
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   acceptAnyMedia: false,
   opacity: 0.94,
   position: null,
+  positionWidth: null,
 });
 
 const ALLOWED_MODES = new Set(['compact', 'expanded']);
@@ -25,8 +27,9 @@ function clamp(value, minimum, maximum) {
 
 function sanitizeSettings(input = {}) {
   const output = { ...DEFAULT_SETTINGS };
+  if (typeof input.mascotId === 'string' && /^(none|hotaru|yuki-school|yuki-black|custom-[a-f0-9]{32})$/.test(input.mascotId)) output.mascotId = input.mascotId;
 
-  output.settingsVersion = 4;
+  output.settingsVersion = 5;
   if (ALLOWED_MODES.has(input.mode)) output.mode = input.mode;
   if (typeof input.clickThrough === 'boolean') output.clickThrough = input.clickThrough;
   if (typeof input.showTranslation === 'boolean') output.showTranslation = input.showTranslation;
@@ -54,24 +57,27 @@ function sanitizeSettings(input = {}) {
       y: Math.round(input.position.y),
     };
   }
+  if ([304, 484, 584].includes(input.positionWidth)) output.positionWidth = input.positionWidth;
 
   return output;
 }
 
 function migrateSettings(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid settings');
   const version = Number(input.settingsVersion || 0);
+  if (version <= 4 && !Object.hasOwn(input, 'mascotId')) input = { ...input, mascotId: 'hotaru' };
   if (version >= 3) return sanitizeSettings(input);
 
   if (version >= 2) {
     return sanitizeSettings({
       ...input,
-      settingsVersion: 4,
+      settingsVersion: 5,
     });
   }
 
   return sanitizeSettings({
     ...input,
-    settingsVersion: 4,
+    settingsVersion: 5,
     launchAtLogin: true,
     autoShowWithNetease: true,
     topmostMode: 'fullscreen',
